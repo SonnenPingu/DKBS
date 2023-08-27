@@ -102,4 +102,3 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
 // Den Bot mit deinem Token anmelden
 client.login('DEIN_DISCORD_BOT_TOKEN');
-
