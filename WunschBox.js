@@ -4,10 +4,32 @@ const cheerio = require('cheerio');
 
 const client = new Discord.Client();
 const prefix = '!'; // Das Präfix für Bot-Befehle
+const streamURL = 'DEINE_SHOUTCAST_STREAM_URL'; // URL des Shoutcast-Streams
 
 client.once('ready', () => {
     console.log('Bot ist bereit!');
+    checkStreamStatus(); // Überprüfe den Stream-Status, sobald der Bot bereit ist
+    setInterval(checkStreamStatus, 60000); // Überprüfe alle 60 Sekunden den Stream-Status
 });
+
+async function checkStreamStatus() {
+    try {
+        const response = await axios.get(streamURL);
+        const streamData = response.data;
+        const isOnAir = streamData.includes('Stream is currently up.');
+
+        if (isOnAir) {
+            const startIndexOfDJ = streamData.indexOf('Current Song: </font></td><td><font class=default><b>') + 'Current Song: </font></td><td><font class=default><b>'.length;
+            const endIndexOfDJ = streamData.indexOf('</b></font></td></tr>', startIndexOfDJ);
+            const djName = streamData.substring(startIndexOfDJ, endIndexOfDJ);
+
+            const channel = client.channels.cache.get('DEINE_DISCORD_CHANNEL_ID'); // ID des Discord-Textkanals
+            channel.send(`🎙️ OnAir: ${djName}`);
+        }
+    } catch (error) {
+        console.error('Fehler beim Überprüfen des Stream-Status:', error);
+    }
+}
 
 client.on('message', async message => {
     if (message.author.bot) return;
