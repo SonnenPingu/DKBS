@@ -7,6 +7,8 @@ const prefix = '!'; // Das Präfix für Bot-Befehle
 const streamURL = 'DEINE_SHOUTCAST_STREAM_URL'; // URL des Shoutcast-Streams
 let previousDJ = null;
 
+const onAirRoleId = 'ROLLEN_ID_ONAIR'; // ID der Rolle für "OnAir"
+
 client.once('ready', () => {
     console.log('Bot ist bereit!');
     checkStreamStatus();
@@ -68,5 +70,36 @@ client.on('message', async message => {
     }
 });
 
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (user.bot) return;
+
+    if (reaction.emoji.name === '🎙️') {
+        const member = reaction.message.guild.members.cache.get(user.id);
+        if (member) {
+            try {
+                await member.roles.add(onAirRoleId);
+            } catch (error) {
+                console.error('Fehler beim Hinzufügen der Rolle:', error);
+            }
+        }
+    }
+});
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    if (user.bot) return;
+
+    if (reaction.emoji.name === '🎙️') {
+        const member = reaction.message.guild.members.cache.get(user.id);
+        if (member) {
+            try {
+                await member.roles.remove(onAirRoleId);
+            } catch (error) {
+                console.error('Fehler beim Entfernen der Rolle:', error);
+            }
+        }
+    }
+});
+
 // Den Bot mit deinem Token anmelden
 client.login('DEIN_DISCORD_BOT_TOKEN');
+
