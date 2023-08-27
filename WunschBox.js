@@ -1,33 +1,30 @@
 const Discord = require('discord.js');
 const axios = require('axios');
-const cheerio = require('cheerio');
 
 const client = new Discord.Client();
 const prefix = '!'; // Das Präfix für Bot-Befehle
-const streamURL = 'DEINE_SHOUTCAST_STREAM_URL'; // URL des Shoutcast-Streams
+const wordpressAPI = 'DEINE_WORDPRESS_REST_API_URL'; // URL zur WordPress REST API, z. B. 'https://deinewordpresswebsite.com/wp-json/wp/v2/posts'
+const wunschBoxPostID = DEINE_WUNSCHBOX_POST_ID; // ID des WordPress-Beitrags für die Wunschbox
+const grussBoxPostID = DEINE_GRUSSBOX_POST_ID; // ID des WordPress-Beitrags für die Grußbox
 
 client.once('ready', () => {
     console.log('Bot ist bereit!');
-    checkStreamStatus(); // Überprüfe den Stream-Status, sobald der Bot bereit ist
-    setInterval(checkStreamStatus, 60000); // Überprüfe alle 60 Sekunden den Stream-Status
+    checkWordPressPost(); // Überprüfe die WordPress-Beiträge, sobald der Bot bereit ist
+    setInterval(checkWordPressPost, 60000); // Überprüfe alle 60 Sekunden die WordPress-Beiträge
 });
 
-async function checkStreamStatus() {
+async function checkWordPressPost() {
     try {
-        const response = await axios.get(streamURL);
-        const streamData = response.data;
-        const isOnAir = streamData.includes('Stream is currently up.');
+        const response = await axios.get(wordpressAPI);
+        const latestPost = response.data[0]; // Annahme: Das neueste Post ist das erste Element im Array
 
-        if (isOnAir) {
-            const startIndexOfDJ = streamData.indexOf('Current Song: </font></td><td><font class=default><b>') + 'Current Song: </font></td><td><font class=default><b>'.length;
-            const endIndexOfDJ = streamData.indexOf('</b></font></td></tr>', startIndexOfDJ);
-            const djName = streamData.substring(startIndexOfDJ, endIndexOfDJ);
+        const title = latestPost.title.rendered;
+        const content = latestPost.content.rendered;
 
-            const channel = client.channels.cache.get('DEINE_DISCORD_CHANNEL_ID'); // ID des Discord-Textkanals
-            channel.send(`🎙️ OnAir: ${djName}`);
-        }
+        const channel = client.channels.cache.get('DEINE_DISCORD_CHANNEL_ID'); // ID des Discord-Textkanals
+        channel.send(`📢 Neuer WordPress Beitrag: ${title}\n\n${content}`);
     } catch (error) {
-        console.error('Fehler beim Überprüfen des Stream-Status:', error);
+        console.error('Fehler beim Überprüfen der WordPress-Beiträge:', error);
     }
 }
 
@@ -40,14 +37,15 @@ client.on('message', async message => {
 
     if (command === 'zeigebox') {
         try {
-            const response = await axios.get('DEINE_HTML5_WEBSEITE_URL');
-            const $ = cheerio.load(response.data);
-            const wunschBoxText = $('.wunsch-box').text(); // Klasse der Wunsch-Box auf deiner Webseite
-            const grussBoxText = $('.gruss-box').text(); // Klasse der Gruß-Box auf deiner Webseite
+            const wunschBoxResponse = await axios.get(`https://deinewordpresswebsite.com/wp-json/wp/v2/posts/${wunschBoxPostID}`);
+            const grussBoxResponse = await axios.get(`https://deinewordpresswebsite.com/wp-json/wp/v2/posts/${grussBoxPostID}`);
 
-            message.channel.send(`Wunsch-Box: ${wunschBoxText}\nGruß-Box: ${grussBoxText}`);
+            const wunschBoxContent = wunschBoxResponse.data.content.rendered;
+            const grussBoxContent = grussBoxResponse.data.content.rendered;
+
+            message.channel.send(`Wunsch-Box:\n${wunschBoxContent}\n\nGruß-Box:\n${grussBoxContent}`);
         } catch (error) {
-            console.error('Fehler beim Abrufen der Webseite:', error);
+            console.error('Fehler beim Abrufen der WordPress-Inhalte:', error);
             message.channel.send('Es ist ein Fehler aufgetreten.');
         }
     }
