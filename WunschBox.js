@@ -26,13 +26,17 @@ async function checkStreamStatus() {
             if (currentDJIndex !== -1) {
                 const startIndexOfDJ = currentDJIndex + 'Current Song: </font></td><td><font class=default><b>'.length;
                 const endIndexOfDJ = streamData.indexOf('</b></font></td></tr>', startIndexOfDJ);
-                const djName = streamData.substring(startIndexOfDJ, endIndexOfDJ);
+                const djAndMusicTitle = streamData.substring(startIndexOfDJ, endIndexOfDJ);
                 
-                if (previousDJ !== djName) {
-                    previousDJ = djName;
-                    
+                if (previousDJ !== djAndMusicTitle) {
+                    previousDJ = djAndMusicTitle;
                     const channel = client.channels.cache.get('DEINE_DISCORD_CHANNEL_ID'); // ID des Discord-Textkanals
-                    channel.send(`🎙️ OnAir: ${djName}`);
+                    channel.send({
+                        embed: {
+                            color: 0x00ff00,
+                            description: `🎙️ Live für euch on Air 🎙️\n\n${djAndMusicTitle}`
+                        }
+                    });
                 }
             }
         });
