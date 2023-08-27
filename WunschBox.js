@@ -5,7 +5,7 @@ const { Readable } = require('stream');
 const client = new Discord.Client();
 const prefix = '!'; // Das Präfix für Bot-Befehle
 const streamURL = 'DEINE_SHOUTCAST_STREAM_URL'; // URL des Shoutcast-Streams
-let isCurrentlyOnAir = false;
+let previousDJ = null;
 
 client.once('ready', () => {
     console.log('Bot ist bereit!');
@@ -21,16 +21,19 @@ async function checkStreamStatus() {
 
         stream.on('data', chunk => {
             streamData += chunk.toString();
-            if (!isCurrentlyOnAir && streamData.includes('Stream is currently up.')) {
-                const startIndexOfDJ = streamData.indexOf('Current Song: </font></td><td><font class=default><b>') + 'Current Song: </font></td><td><font class=default><b>'.length;
+            const currentDJIndex = streamData.indexOf('Current Song: </font></td><td><font class=default><b>');
+            
+            if (currentDJIndex !== -1) {
+                const startIndexOfDJ = currentDJIndex + 'Current Song: </font></td><td><font class=default><b>'.length;
                 const endIndexOfDJ = streamData.indexOf('</b></font></td></tr>', startIndexOfDJ);
                 const djName = streamData.substring(startIndexOfDJ, endIndexOfDJ);
-
-                const channel = client.channels.cache.get('DEINE_DISCORD_CHANNEL_ID'); // ID des Discord-Textkanals
-                channel.send(`🎙️ OnAir: ${djName}`);
-                isCurrentlyOnAir = true;
-            } else if (isCurrentlyOnAir && !streamData.includes('Stream is currently up.')) {
-                isCurrentlyOnAir = false;
+                
+                if (previousDJ !== djName) {
+                    previousDJ = djName;
+                    
+                    const channel = client.channels.cache.get('DEINE_DISCORD_CHANNEL_ID'); // ID des Discord-Textkanals
+                    channel.send(`🎙️ OnAir: ${djName}`);
+                }
             }
         });
     } catch (error) {
