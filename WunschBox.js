@@ -328,9 +328,3 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
 // Den Bot mit deinem Token anmelden
 client.login('DEIN_DISCORD_BOT_TOKEN');
-//
-//
-//Bitte ersetze die Platzhalter wie 
-//DEIN_SHOUTCAST_STREAM_URL_SERVER1, DEIN_SHOUTCAST_STREAM_URL_SERVER2, DEIN_SHOUTCAST_STREAM_URL_SERVER3, DEINE_DISCORD_CHANNEL_ID_SERVER1, DEINE_DISCORD_CHANNEL_ID_SERVER2, 
-//DEINE_DISCORD_CHANNEL_ID_SERVER3, ROLLEN_ID_ONAIR, DEIN_DISCORD_BOT_TOKEN, wunschBoxPostID und grussBoxPostID entsprechend mit den richtigen Werten.
-//
