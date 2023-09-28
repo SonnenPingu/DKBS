@@ -1,7 +1,7 @@
 const { Client, Intents, MessageEmbed, MessageActionRow, MessageButton } = require('discord.js');
 const axios = require('axios');
 const { Readable } = require('stream');
-const http = require('http'); // Importiere das http-Modul von Node.js
+const http = require('http');
 
 const client = new Client({
     intents: [
@@ -14,11 +14,9 @@ const client = new Client({
 const prefix = '!';
 const streamURLServer1 = 'http://89.163.216.178:8000/index.html?sid=1';
 const streamURLServer2 = 'http://62.141.46.92/';
-//const streamURLServer3 = 'DEINE_SHOUTCAST_STREAM_URL_SERVER3';
 let previousDJServer1 = null;
 let previousServer2Status = false;
-//let previousServer3Status = false;
-const onAirRoleId = '1145837851309777029'; // ID der Rolle für "OnAir"
+const onAirRoleId = '1145837851309777029';
 
 client.once('ready', () => {
     console.log('Bot is ready!');
@@ -44,14 +42,14 @@ async function checkStreamStatus() {
                 const endIndexOfDJServer1 = streamDataServer1.indexOf('</b></font></td></tr>', startIndexOfDJServer1);
                 const djAndMusicTitleServer1 = streamDataServer1.substring(startIndexOfDJServer1, endIndexOfDJServer1);
 
-                const djNameIndex = djAndMusicTitleServer1.indexOf('|') + 1; // Such nach dem "|", um den DJ-Namen zu extrahieren
+                const djNameIndex = djAndMusicTitleServer1.indexOf('|') + 1;
                 const djName = djAndMusicTitleServer1.substring(djNameIndex).trim();
-                const musicTitleIndex = djAndMusicTitleServer1.indexOf('|') - 1; // Such vor dem "|" nach dem Musiktitel
+                const musicTitleIndex = djAndMusicTitleServer1.indexOf('|') - 1;
                 const musicTitle = djAndMusicTitleServer1.substring(0, musicTitleIndex).trim();
 
                 if (previousDJServer1 !== djAndMusicTitleServer1) {
                     previousDJServer1 = djAndMusicTitleServer1;
-                    const channelServer1 = client.channels.cache.get('1145840462826053652'); // ID des Discord-Textkanals für Server 1
+                    const channelServer1 = client.channels.cache.get('1145840462826053652');
                     const embed = new Discord.MessageEmbed()
                         .setColor(0x00ff00)
                         .setDescription(`🎙️ ${djName} ist live für euch on Air 🎙️\n\nMusiktitel: ${musicTitle}`);
@@ -60,14 +58,13 @@ async function checkStreamStatus() {
             }
         });
 
-
         // Überprüfe Server 2 (mit DJ/Musik-Abfrage)
         const responseServer2 = await fetchDataFromServer(streamURLServer2);
 
         // Überprüfe Server 2 (nur Online-Status)
         if (previousServer2Status !== false) {
             previousServer2Status = false;
-            const channelServer2 = client.channels.cache.get('1145842497860423700'); // ID des Discord-Textkanals für Server 2
+            const channelServer2 = client.channels.cache.get('1145842497860423700');
             const statusServer2 = generateStatusMessage('Server 2', null, null, null, false);
             channelServer2.send(statusServer2);
         }
@@ -75,7 +72,7 @@ async function checkStreamStatus() {
         if (responseServer2 && responseServer2.status === 200) {
             if (previousServer2Status !== true) {
                 previousServer2Status = true;
-                const channelServer2 = client.channels.cache.get('1145842497860423700'); // ID des Discord-Textkanals für Server 2
+                const channelServer2 = client.channels.cache.get('1145842497860423700');
                 const statusServer2 = generateStatusMessage('Server 2', null, null, null, true);
                 channelServer2.send(statusServer2);
             }
@@ -86,13 +83,12 @@ async function checkStreamStatus() {
     }
 }
 
-// Funktion zum Abrufen von Daten von einem Server
 function fetchDataFromServer(url) {
     return new Promise((resolve, reject) => {
         const options = {
             method: 'GET',
             headers: {
-                'User-Agent': 'DKBS' // Setze hier den Namen deines Bots ein
+                'User-Agent': 'DKBS'
             }
         };
 
@@ -142,7 +138,7 @@ client.on('message', async message => {
 });
 
 function createOnAirButton() {
-    const channel = client.channels.cache.get('1145840486725193801'); // ID des Channels, in dem der Button erstellt werden soll
+    const channel = client.channels.cache.get('1145840486725193801');
 
     const onAirButton = new MessageButton()
         .setCustomId('on_air_button')
@@ -174,7 +170,7 @@ client.on('interactionCreate', async interaction => {
 
         collector.on('collect', async reaction => {
             if (reaction.emoji.name === '✅') {
-                collector.stop(); // Stop collecting reactions
+                collector.stop();
 
                 if (isOnAir) {
                     await member.roles.remove(onAirRoleId);
@@ -184,4 +180,18 @@ client.on('interactionCreate', async interaction => {
                     await interaction.followUp({ content: 'Du bist jetzt "OnAir".', ephemeral: true });
                 }
             } else if (reaction.emoji.name === '❌') {
-                collector.stop(); // Stop collecting reactions
+                collector.stop();
+                await interaction.followUp({ content: 'Aktion abgebrochen.', ephemeral: true });
+            }
+        });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                interaction.followUp({ content: 'Du hast nicht rechtzeitig reagiert. Aktion abgebrochen.', ephemeral: true });
+            }
+        });
+    }
+});
+
+// Den Bot mit deinem Token anmelden
+client.login('TOKEN');
