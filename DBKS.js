@@ -206,61 +206,48 @@ client.on('message', async message => {
 
     // Hier kannst du deine Befehlsverarbeitung hinzufügen, wenn benötigt
 });
+client.once('ready', async () => {
+    const onAirRoleId = '1145837851309777029'; // Deine "OnAir"-Rollen-ID hier
 
-function createOnAirButton() {
-    const channel = client.channels.cache.get('CHannelID!');
+    const channel = client.channels.cache.get('1145840486725193801'); // Ersetze 'DEIN_CHANNEL_ID' durch die ID des Textkanals, in den die Nachricht gesendet werden soll
 
-    const onAirButton = new MessageButton()
-        .setCustomId('on_air_button')
-        .setLabel('OnAir')
-        .setStyle('PRIMARY');
-
-    const row = new MessageActionRow().addComponents(onAirButton);
-
-    channel.send({ content: 'Klicke auf den Button, um "OnAir" zu gehen:', components: [row] });
-}
-
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isButton()) return;
-
-    if (interaction.customId === 'on_air_button') {
-        const member = interaction.member;
-        const isOnAir = member.roles.cache.has(onAirRoleId);
-
-        const confirmationMessage = await interaction.reply({
-            content: isOnAir ? 'Bist du sicher, dass du nicht mehr "OnAir" sein möchtest?' : 'Bist du sicher, dass du "OnAir" gehen möchtest?',
-            fetchReply: true
-        });
-
-        await confirmationMessage.react('✅');
-        await confirmationMessage.react('❌');
-
-        const filter = (reaction, user) => ['✅', '❌'].includes(reaction.emoji.name) && user.id === interaction.user.id;
-        const collector = confirmationMessage.createReactionCollector({ filter, time: 30000 });
-
-        collector.on('collect', async reaction => {
-            if (reaction.emoji.name === '✅') {
-                collector.stop();
-
-                if (isOnAir) {
-                    await member.roles.remove(onAirRoleId);
-                    await interaction.followUp({ content: 'Du bist nicht mehr "OnAir".', ephemeral: true });
-                } else {
-                    await member.roles.add(onAirRoleId);
-                    await interaction.followUp({ content: 'Du bist jetzt "OnAir".', ephemeral: true });
-                }
-
-                // Lösche die Frage des Bots
-                confirmationMessage.delete();
-            } else if (reaction.emoji.name === '❌') {
-                collector.stop();
-                await interaction.followUp({ content: 'Aktion abgebrochen.', ephemeral: true });
-                
-                // Lösche die Frage des Bots
-                confirmationMessage.delete();
-            }
-        });
+    if (!channel) {
+        console.error('Der Textkanal wurde nicht gefunden.');
+        return;
     }
+
+    const onAirMessage = await channel.send('Klicke auf das Symbol für die "OnAir" Anzeige! 🎙️');
+
+    // Füge das Mikrofon-Emoji als Reaktion hinzu
+    await onAirMessage.react('🎙️');
+
+    // Erstelle einen Reaktionsfilter, der nur auf das Mikrofon-Emoji reagiert
+    const filter = (reaction, user) => reaction.emoji.name === '🎙️' && !user.bot;
+
+    // Erstelle einen Reaktionskollektor, der auf Reaktionen auf diese Nachricht reagiert
+    const collector = onAirMessage.createReactionCollector({ filter, time: 60000 }); // Reagiere für 60 Sekunden
+
+    collector.on('collect', async (reaction, user) => {
+        // Überprüfe, ob der Benutzer bereits die "OnAir"-Rolle hat
+        if (user) {
+            if (channel.guild.members.cache.get(user.id).roles.cache.has(onAirRoleId)) {
+                // Benutzer hat bereits die "OnAir"-Rolle, entferne sie
+                await channel.guild.members.cache.get(user.id).roles.remove(onAirRoleId);
+            } else {
+                // Benutzer hat die "OnAir"-Rolle nicht, füge sie hinzu
+                await channel.guild.members.cache.get(user.id).roles.add(onAirRoleId);
+            }
+
+            // Entferne die Reaktion des Benutzers, um die Schaltfläche zurückzusetzen
+            await reaction.users.remove(user.id);
+        }
+    });
+
+    // Überwache das Ende des Kollektors
+    collector.on('end', () => {
+        // Entferne die Reaktionen und Nachricht, wenn der Kollektor endet
+        onAirMessage.reactions.removeAll();
+    });
 });
 
 // Den Bot mit deinem Token anmelden WICHTIG DU MUSST DIE DATA.json füllen!
