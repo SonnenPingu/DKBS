@@ -49,7 +49,8 @@ async function checkStreamStatusServer1() {
 
         // Hier verwenden wir cheerio, um den Moderator, Interpreten und Titel zu extrahieren
         const $ = cheerio.load(server1Data);
-        const anchorElement = $('body > table:nth-child(4) > tbody > tr:nth-child(8) > td:nth-child(2) > b > a'); //WICHTIG IHR Müsst den PFAD an eure Gegegnheiten anpassen!
+        const anchorElement = $('body > table:nth-child(4) > tbody > tr:nth-child(8) > td:nth-child(2) > b > a');  
+//WICHTIG IHR Müsst den PFAD an eure Gegegnheiten anpassen!
         const text = anchorElement.text().trim();
 
         // Überprüfung auf leere Werte
