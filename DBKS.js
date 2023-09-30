@@ -2,6 +2,7 @@ const fs = require('fs');
 const { Client, Intents, MessageEmbed, MessageActionRow, MessageButton } = require('discord.js');
 const axios = require('axios');
 const http = require('http');
+const cheerio = require('cheerio');
 
 // Lese die Token-Daten aus DATA.json
 const data = fs.readFileSync('DATA.json', 'utf8');
@@ -16,11 +17,11 @@ const client = new Client({
 });
 
 const prefix = '!';
-const streamURLServer1 = 'URL ODER IP FÜR SERVER 1'; // Aktualisiere die URL für Server 1
-const pingURLServer2 = 'URL ODER IP FÜR SERVER 2'; // Aktualisiere die URL für Server 2
+const streamURLServer1 = 'URL'; // Aktualisiere die URL
+const streamURLServer2 = 'URL'; // Aktualisiere die URL
 const pingInterval = 24 * 60 * 60 * 1000; // 24 Stunden in Millisekunden
 const pingIntervalServer2 = 24 * 60 * 60 * 1000; // 24 Stunden in Millisekunden für Server 2
-const onAirRoleId = 'ROLLEN ID FÜR ON-AIR';
+const onAirRoleId = 'ROLLENID';
 
 client.once('ready', () => {
     console.log('Bot is ready!');
@@ -48,7 +49,7 @@ async function checkStreamStatusServer1() {
 
         // Hier verwenden wir cheerio, um den Moderator, Interpreten und Titel zu extrahieren
         const $ = cheerio.load(server1Data);
-        const anchorElement = $('body > table:nth-child(4) > tbody > tr:nth-child(8) > td:nth-child(2) > b > a');
+        const anchorElement = $('body > table:nth-child(4) > tbody > tr:nth-child(8) > td:nth-child(2) > b > a'); //WICHTIG IHR Müsst den PFAD an eure Gegegnheiten anpassen!
         const text = anchorElement.text().trim();
 
         // Überprüfung auf leere Werte
@@ -84,7 +85,7 @@ async function checkStreamStatusServer1() {
         console.log('Titel auf Server 1:', title);
 
         // Erstelle ein Embed oder sende eine Nachricht mit den Informationen
-        const channelServer1 = client.channels.cache.get('KANAL-ID-FÜR-SERVER-1'); // Aktualisiere die Kanal-ID für Server 1
+        const channelServer1 = client.channels.cache.get('ChannelID'); // Aktualisiere die Kanal-ID für Server 1
 
         if (!channelServer1) {
             console.error('Kanal für Server 1 nicht gefunden.');
@@ -93,7 +94,8 @@ async function checkStreamStatusServer1() {
 
         const embed = new MessageEmbed()
             .setColor(0x00ff00)
-            .setDescription(`🎙️ ${finalModerator} spielt gerade: ${title} von ${artist}`);
+            .setDescription(`🎙️ Live ist ${finalModerator}\nGespielt wird ${title} von ${artist}`);
+
 
         if (!embed.description) {
             console.error('Embed-Beschreibung ist leer.');
@@ -112,7 +114,7 @@ async function pingStreamServer1() {
         // Hier Server 1 anpingen und den Status aktualisieren
         const isServerOnline = await isServerOnline(streamURLServer1); // Verwenden Sie Ihre eigene Logik hier, um den Server-Status zu überprüfen
 
-        const channelServerStatus = client.channels.cache.get('KANAL-ID-FÜR-SERVER-1'); // Aktualisiere die Channel-ID für Server 1
+        const channelServerStatus = client.channels.cache.get('ChannelID'); // Aktualisiere die Channel-ID für Server 1
         const statusMessage = generateStatusMessage('Server 1', null, null, null, isServerOnline);
         channelServerStatus.send(statusMessage);
     } catch (error) {
@@ -125,9 +127,9 @@ async function pingStreamServer1() {
 async function pingStreamServer2() {
     try {
         // Hier Server 2 anpingen und den Status aktualisieren
-        const isServerOnline = await isServerOnline(pingURLServer2); // Verwenden Sie Ihre eigene Logik hier, um den Server-Status zu überprüfen
+        const isServerOnline = await isServerOnline(streamURLServer2); // Verwenden Sie Ihre eigene Logik hier, um den Server-Status zu überprüfen
 
-        const channelServer2 = client.channels.cache.get('KANAL-ID-FÜR-SERVER-2'); // Aktualisiere die Kanal-ID für Server 2
+        const channelServer2 = client.channels.cache.get('ChannelID); // Aktualisiere die Kanal-ID für Server 2
         const statusMessage = generateStatusMessage('Server 2', null, null, null, isServerOnline);
         channelServer2.send(statusMessage);
     } catch (error) {
@@ -135,6 +137,15 @@ async function pingStreamServer2() {
     }
 }
 
+async function isServerOnline(url) {
+    try {
+        const response = await axios.get(url);
+        return response.status === 200; // Der Server ist online, wenn der Statuscode 200 (OK) ist
+    } catch (error) {
+        console.error('Fehler beim Überprüfen des Serverstatus:', error);
+        return false; // Der Server ist offline oder es gab einen Fehler bei der Anfrage
+    }
+}
 
 function fetchDataFromServer(url) {
     return new Promise((resolve, reject) => {
@@ -164,6 +175,7 @@ function fetchDataFromServer(url) {
         req.end();
     });
 }
+
 function generateStatusMessage(serverName, djAndMusicTitle, time, ping, isOnline) {
     let statusMessage = `**${serverName} `;
 
@@ -190,7 +202,7 @@ client.on('message', async message => {
 });
 
 function createOnAirButton() {
-    const channel = client.channels.cache.get('1145840486725193801');
+    const channel = client.channels.cache.get('CHannelID!');
 
     const onAirButton = new MessageButton()
         .setCustomId('on_air_button')
@@ -201,6 +213,7 @@ function createOnAirButton() {
 
     channel.send({ content: 'Klicke auf den Button, um "OnAir" zu gehen:', components: [row] });
 }
+
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
@@ -243,5 +256,6 @@ client.on('interactionCreate', async interaction => {
         });
     }
 });
+
 // Den Bot mit deinem Token anmelden WICHTIG DU MUSST DIE DATA.json füllen!
 client.login(discord_token);
