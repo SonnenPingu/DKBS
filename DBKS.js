@@ -3,6 +3,8 @@ const { Client, Intents, MessageEmbed, MessageActionRow, MessageButton } = requi
 const axios = require('axios');
 const http = require('http');
 const cheerio = require('cheerio');
+let lastPlayedTitle = '';
+let lastPlayedArtist = '';
 
 // Lese die Token-Daten aus DATA.json
 const data = fs.readFileSync('DATA.json', 'utf8');
@@ -27,7 +29,7 @@ client.once('ready', () => {
     console.log('Bot is ready!');
     createOnAirButton();
     checkStreamStatusServer1();
-    setInterval(checkStreamStatusServer1, 180000);
+    setInterval(checkStreamStatusServer1, 120000);
     setInterval(pingStreamServer2, pingIntervalServer2); // Alle 24 Stunden Server 2 anpingen
     setInterval(pingStreamServer1, pingInterval); // Alle 24 Stunden Server 1 anpingen
 });
@@ -73,43 +75,46 @@ async function checkStreamStatusServer1() {
         } else {
             [artist, title] = text.split(' - ');
         }
-
-        // Überprüfen, ob Interpret und Titel vorhanden sind
+ // Überprüfen, ob Interpret und Titel vorhanden sind
         if (!artist || !title) {
             console.error('Ungültige Werte für Nachricht auf Server 1.');
             return;
         }
 
-        // Hier kannst du die gewonnenen Informationen verwenden
-        console.log('Moderator auf Server 1:', finalModerator);
-        console.log('Interpret auf Server 1:', artist);
-        console.log('Titel auf Server 1:', title);
+        // Überprüfen, ob sich die Informationen geändert haben
+        if (lastPlayedTitle !== title || lastPlayedArtist !== artist) {
+            // Hier kannst du die gewonnenen Informationen verwenden
+            console.log('Moderator auf Server 1:', finalModerator);
+            console.log('Interpret auf Server 1:', artist);
+            console.log('Titel auf Server 1:', title);
 
-        // Erstelle ein Embed oder sende eine Nachricht mit den Informationen
-        const channelServer1 = client.channels.cache.get('ChannelID'); // Aktualisiere die Kanal-ID für Server 1
+            // Erstelle ein Embed oder sende eine Nachricht mit den Informationen
+            const channelServer1 = client.channels.cache.get('ChannelID'); // Aktualisiere die Kanal-ID für Server 1
 
-        if (!channelServer1) {
-            console.error('Kanal für Server 1 nicht gefunden.');
-            return;
+            if (!channelServer1) {
+                console.error('Kanal für Server 1 nicht gefunden.');
+                return;
+            }
+
+            const embed = new MessageEmbed()
+                .setColor(0x00ff00)
+                .setDescription(`🎙️ Live ist ${finalModerator}\nGespielt wird ${title} von ${artist}`);
+
+            if (!embed.description) {
+                console.error('Embed-Beschreibung ist leer.');
+                return;
+            }
+
+            channelServer1.send({ embeds: [embed] });
+
+            // Aktualisiere die zuletzt gespielten Informationen
+            lastPlayedTitle = title;
+            lastPlayedArtist = artist;
         }
-
-        const embed = new MessageEmbed()
-            .setColor(0x00ff00)
-            .setDescription(`🎙️ Live ist ${finalModerator}\nGespielt wird ${title} von ${artist}`);
-
-
-        if (!embed.description) {
-            console.error('Embed-Beschreibung ist leer.');
-            return;
-        }
-
-        channelServer1.send({ embeds: [embed] });
-        // Der Rest deines Codes...
     } catch (error) {
         console.error('Fehler beim Überprüfen des Stream-Status auf Server 1:', error);
     }
 }
-
 async function pingStreamServer1() {
     try {
         // Hier Server 1 anpingen und den Status aktualisieren
