@@ -25,3 +25,7 @@ axios
 cheerio
 jsdom
 
+
+
+
+[![CodeQL](https://github.com/SonnenPingu/DKBS/actions/workflows/codeql.yml/badge.svg)](https://github.com/SonnenPingu/DKBS/actions/workflows/codeql.yml)
