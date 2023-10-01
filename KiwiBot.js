@@ -89,10 +89,19 @@ async function checkStreamStatusServer1() {
         } else {
             [artist, title] = text.split(' - ');
         }
- // Überprüfen, ob Interpret und Titel vorhanden sind
+
+        // Überprüfen, ob Interpret und Titel vorhanden sind
         if (!artist || !title) {
             console.error('Ungültige Werte für Nachricht auf Server 1.');
-            return;
+            
+            // Fallback-Titel und Interpret, wenn keine gefunden werden
+            artist = 'Kiwi Sound';
+            title = 'Der böse';
+            
+            // Fallback für Moderator, wenn kein Moderator nach dem | gefunden wird
+            if (text.includes('<a href="currentsong?sid=1">')) {
+                finalModerator = text.split('<a href="currentsong?sid=1">')[1].split('</a>')[0];
+            }
         }
 
         // Überprüfen, ob sich die Informationen geändert haben
