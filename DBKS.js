@@ -1,10 +1,13 @@
 const fs = require('fs');
-const { Client, Intents, MessageEmbed, MessageActionRow, MessageButton } = require('discord.js');
+const { Client, Intents, MessageEmbed, WebhookClient } = require('discord.js');
 const axios = require('axios');
-const http = require('http');
 const cheerio = require('cheerio');
+const jsdom = require('jsdom');
+
 let lastPlayedTitle = '';
 let lastPlayedArtist = '';
+let previousModerator = null; // Speichert den vorherigen Moderator
+let previousTime = null; // Speichert die vorherige Uhrzeit
 
 // Lese die Token-Daten aus DATA.json
 const data = fs.readFileSync('DATA.json', 'utf8');
@@ -14,28 +17,40 @@ const client = new Client({
     intents: [
         Intents.FLAGS.GUILDS,
         Intents.FLAGS.GUILD_MESSAGES,
-        Intents.FLAGS.GUILD_MESSAGE_REACTIONS
-    ]
+        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
+    ],
 });
 
-const prefix = '!';
-const streamURLServer1 = 'URL'; // Aktualisiere die URL
-const streamURLServer2 = 'URL'; // Aktualisiere die URL
+const prefix = '!'; // Aktualisiere den gewünschten Präfix
+const onAirRoleId = 'RolleID'; // Aktualisiere mit der gewünschten Rollen-ID
+
+const streamURLServer1 = 'URL'; // Aktualisiere die URL für Server 1
+const streamURLServer2 = 'URL'; // Aktualisiere die URL für Server 2
+
 const pingInterval = 24 * 60 * 60 * 1000; // 24 Stunden in Millisekunden
 const pingIntervalServer2 = 24 * 60 * 60 * 1000; // 24 Stunden in Millisekunden für Server 2
-const onAirRoleId = 'ROLLENID';
+const webhookUrl = 'Webhook'; // Aktualisiere mit deiner Webhook-URL
+const sendeplanUrl = 'URL'; // Aktualisiere die URL für den Sendeplan
+const sendeplanFilePath = 'Sendeplan.json'; // Dateipfad für die Sendeplaninformationen
+const channelServer1Id = 'CHANNELID'; // Kanal-ID für Server 1
+const channelServer2Id = 'CHANNELID'; // Kanal-ID für Server 2
 
+//Aufruf Client
 client.once('ready', () => {
     console.log('Bot is ready!');
-    createOnAirButton();
     checkStreamStatusServer1();
-    setInterval(checkStreamStatusServer1, 120000);
-    setInterval(pingStreamServer2, pingIntervalServer2); // Alle 24 Stunden Server 2 anpingen
-    setInterval(pingStreamServer1, pingInterval); // Alle 24 Stunden Server 1 anpingen
+    setInterval(checkStreamStatusServer1, 60000);
+// Intervall für das Pingen und Senden von Statusnachrichten für Server 1
+    setInterval(() => {
+    pingStreamServer1(channelServer1Id);
+}, pingInterval);
+
+// Intervall für das Pingen und Senden von Statusnachrichten für Server 2
+setInterval(() => {
+    pingStreamServer2(channelServer2Id);
+}, pingInterval);
 });
-
 // Funktionen für Server 1
-
 async function checkStreamStatusServer1() {
     try {
         // Holen der HTML-Seite von Server 1
@@ -51,8 +66,7 @@ async function checkStreamStatusServer1() {
 
         // Hier verwenden wir cheerio, um den Moderator, Interpreten und Titel zu extrahieren
         const $ = cheerio.load(server1Data);
-        const anchorElement = $('body > table:nth-child(4) > tbody > tr:nth-child(8) > td:nth-child(2) > b > a');  
-//WICHTIG IHR Müsst den PFAD an eure Gegegnheiten anpassen!
+        const anchorElement = $('body > table:nth-child(4) > tbody > tr:nth-child(8) > td:nth-child(2) > b > a');
         const text = anchorElement.text().trim();
 
         // Überprüfung auf leere Werte
@@ -89,7 +103,7 @@ async function checkStreamStatusServer1() {
             console.log('Titel auf Server 1:', title);
 
             // Erstelle ein Embed oder sende eine Nachricht mit den Informationen
-            const channelServer1 = client.channels.cache.get('ChannelID'); // Aktualisiere die Kanal-ID für Server 1
+            const channelServer1 = client.channels.cache.get('1145840462826053652'); // Aktualisiere die Kanal-ID für Server 1
 
             if (!channelServer1) {
                 console.error('Kanal für Server 1 nicht gefunden.');
@@ -98,7 +112,7 @@ async function checkStreamStatusServer1() {
 
             const embed = new MessageEmbed()
                 .setColor(0x00ff00)
-                .setDescription(`🎙️ Live ist ${finalModerator}\nGespielt wird ${title} von ${artist}`);
+                .setDescription(`🎙️ Live ist **${finalModerator}!**\nGespielt wird *${title}* von *${artist}*.`);
 
             if (!embed.description) {
                 console.error('Embed-Beschreibung ist leer.');
@@ -115,140 +129,178 @@ async function checkStreamStatusServer1() {
         console.error('Fehler beim Überprüfen des Stream-Status auf Server 1:', error);
     }
 }
-async function pingStreamServer1() {
+async function isServerOnline(serverURL) {
     try {
-        // Hier Server 1 anpingen und den Status aktualisieren
-        const isServerOnline = await isServerOnline(streamURLServer1); // Verwenden Sie Ihre eigene Logik hier, um den Server-Status zu überprüfen
+        const response = await axios.head(serverURL);
+        return response.status === 200; // Überprüft, ob der Server mit Statuscode 200 antwortet (OK)
+    } catch (error) {
+        console.error('Fehler beim Überprüfen des Serverstatus:', error);
+        return false; // Der Server wird als offline betrachtet, wenn eine Ausnahme auftritt
+    }
+}
+async function pingHTTPServer(serverURL) {
+    try {
+        const startTime = Date.now(); // Zeit vor dem Senden der Anfrage
 
-        const channelServerStatus = client.channels.cache.get('ChannelID'); // Aktualisiere die Channel-ID für Server 1
-        const statusMessage = generateStatusMessage('Server 1', null, null, null, isServerOnline);
+        await axios.get(serverURL);
+
+        const endTime = Date.now(); // Zeit nach dem Empfang der Antwort
+        const roundTripTime = endTime - startTime; // Berechnung der Round-Trip-Zeit in Millisekunden
+
+        return roundTripTime;
+    } catch (error) {
+        console.error('Fehler beim Pingen des HTTP-Servers:', error);
+        return -1; // Oder eine andere geeignete Fehlermeldung oder -1, um anzuzeigen, dass das Pingen fehlgeschlagen ist
+    }
+}
+function generateStatusMessage(serverName, onlineStatus, roundTripTime) {
+    let color;
+
+    if (onlineStatus) {
+        color = '#00ff00'; // Grüner Balken für Online
+        onlineStatus = 'Online';
+    } else {
+        color = '#ff0000'; // Roter Balken für Offline
+        onlineStatus = 'Offline';
+    }
+
+    // Hier können Sie Ihre Statusnachricht erstellen und zurückgeben
+    const embed = new MessageEmbed()
+        .setColor(color)
+        .setDescription(`**Server: ${serverName}**
+Status: ${onlineStatus}
+Ping: ${roundTripTime} ms`);
+
+    return { embeds: [embed] };
+}
+
+async function pingStreamServer1(channelId) {
+    try {
+        const roundTripTime = await pingHTTPServer(streamURLServer1); // Round-Trip-Zeit für Server 1 erhalten
+        const isServerOnlineResult = await isServerOnline(streamURLServer1);
+        console.log('Server 1 Online-Status:', isServerOnlineResult);
+
+        const channelServerStatus = client.channels.cache.get(channelId);
+
+        // Hier eine Statusnachricht generieren, ähnlich wie in checkStreamStatusServer1
+        const serverName = 'StreamServer'; // Setzen Sie den Namen Ihres Servers
+        const onlineStatus = isServerOnlineResult ? true : false; // Hier wird der Online-Status als boolescher Wert übergeben
+
+        const statusMessage = generateStatusMessage(serverName, onlineStatus, roundTripTime);
+
+        // Nachricht senden
         channelServerStatus.send(statusMessage);
+
     } catch (error) {
         console.error('Fehler beim Pingen und Aktualisieren des Status auf Server 1:', error);
     }
 }
 
-// Funktionen für Server 2
-
-async function pingStreamServer2() {
+// Funktion pingStreamServer2, die die Funktion pingHTTPServer verwendet und automatisch Nachrichten sendet
+async function pingStreamServer2(channelId) {
     try {
-        // Hier Server 2 anpingen und den Status aktualisieren
-        const isServerOnline = await isServerOnline(streamURLServer2); // Verwenden Sie Ihre eigene Logik hier, um den Server-Status zu überprüfen
+        const roundTripTime = await pingHTTPServer(streamURLServer2); // Round-Trip-Zeit für Server 2 erhalten
+        const isServerOnlineResult = await isServerOnline(streamURLServer2);
+        console.log('Server 2 Online-Status:', isServerOnlineResult);
 
-        const channelServer2 = client.channels.cache.get('ChannelID); // Aktualisiere die Kanal-ID für Server 2
-        const statusMessage = generateStatusMessage('Server 2', null, null, null, isServerOnline);
-        channelServer2.send(statusMessage);
+        const channelServerStatus = client.channels.cache.get(channelId);
+
+        // Hier eine Statusnachricht generieren, ähnlich wie in checkStreamStatusServer1
+        const serverName = 'ModServer'; // Setzen Sie den Namen Ihres Servers
+        const onlineStatus = isServerOnlineResult ? true : false; // Hier wird der Online-Status als boolescher Wert übergeben
+
+        const statusMessage = generateStatusMessage(serverName, onlineStatus, roundTripTime);
+
+        // Nachricht senden
+        channelServerStatus.send(statusMessage);
+
     } catch (error) {
         console.error('Fehler beim Pingen und Aktualisieren des Status auf Server 2:', error);
     }
 }
-
-async function isServerOnline(url) {
-    try {
-        const response = await axios.get(url);
-        return response.status === 200; // Der Server ist online, wenn der Statuscode 200 (OK) ist
-    } catch (error) {
-        console.error('Fehler beim Überprüfen des Serverstatus:', error);
-        return false; // Der Server ist offline oder es gab einen Fehler bei der Anfrage
-    }
-}
-
-function fetchDataFromServer(url) {
-    return new Promise((resolve, reject) => {
-        const options = {
-            method: 'GET',
-            headers: {
-                'User-Agent': 'DKBS'
-            }
-        };
-
-        const req = http.request(url, options, (res) => {
-            let data = '';
-
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-
-            res.on('end', () => {
-                resolve(data);
-            });
-        });
-
-        req.on('error', (error) => {
-            reject(error);
-        });
-
-        req.end();
-    });
-}
-
-function generateStatusMessage(serverName, djAndMusicTitle, time, ping, isOnline) {
-    let statusMessage = `**${serverName} `;
-
-    if (isOnline !== null) {
-        statusMessage += isOnline ? 'ist online.**' : 'ist offline.**';
-    } else {
-        statusMessage += 'ist online.**\n';
-        statusMessage += `DJ/Musik: ${djAndMusicTitle}\n`;
-        statusMessage += `Time: ${time}\n`;
-        statusMessage += `Ping: ${ping}`;
-    }
-
-    return statusMessage;
-}
-
-client.on('message', async message => {
+client.on('messageCreate', async message => {
     if (message.author.bot) return;
-    if (!message.content.startsWith(prefix)) return;
 
-    const args = message.content.slice(prefix.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+    // Überprüfen, ob die Nachricht mit dem Präfix beginnt
+    if (message.content.startsWith(prefix)) {
+        const args = message.content.slice(prefix.length).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
 
-    // Hier kannst du deine Befehlsverarbeitung hinzufügen, wenn benötigt
-});
-client.once('ready', async () => {
-    const onAirRoleId = '1145837851309777029'; // Deine "OnAir"-Rollen-ID hier
-
-    const channel = client.channels.cache.get('1145840486725193801'); // Ersetze 'DEIN_CHANNEL_ID' durch die ID des Textkanals, in den die Nachricht gesendet werden soll
-
-    if (!channel) {
-        console.error('Der Textkanal wurde nicht gefunden.');
-        return;
-    }
-
-    const onAirMessage = await channel.send('Klicke auf das Symbol für die "OnAir" Anzeige! 🎙️');
-
-    // Füge das Mikrofon-Emoji als Reaktion hinzu
-    await onAirMessage.react('🎙️');
-
-    // Erstelle einen Reaktionsfilter, der nur auf das Mikrofon-Emoji reagiert
-    const filter = (reaction, user) => reaction.emoji.name === '🎙️' && !user.bot;
-
-    // Erstelle einen Reaktionskollektor, der auf Reaktionen auf diese Nachricht reagiert
-    const collector = onAirMessage.createReactionCollector({ filter, time: 60000 }); // Reagiere für 60 Sekunden
-
-    collector.on('collect', async (reaction, user) => {
-        // Überprüfe, ob der Benutzer bereits die "OnAir"-Rolle hat
-        if (user) {
-            if (channel.guild.members.cache.get(user.id).roles.cache.has(onAirRoleId)) {
-                // Benutzer hat bereits die "OnAir"-Rolle, entferne sie
-                await channel.guild.members.cache.get(user.id).roles.remove(onAirRoleId);
-            } else {
-                // Benutzer hat die "OnAir"-Rolle nicht, füge sie hinzu
-                await channel.guild.members.cache.get(user.id).roles.add(onAirRoleId);
+        if (command === 'ping') {
+            // Führe die Ping-Funktion für Server 1 aus und sende die Statusnachricht
+            const pingMessage = await pingStreamServer1(channelServer1Id); // Hier die Kanal-ID für Server 1 einfügen
+            if (pingMessage && pingMessage.content) {
+                message.channel.send(pingMessage).then(msg => msg.delete()); // Nachricht senden und sofort löschen
             }
 
-            // Entferne die Reaktion des Benutzers, um die Schaltfläche zurückzusetzen
-            await reaction.users.remove(user.id);
+            // Führe die Ping-Funktion für Server 2 aus und sende die Statusnachricht
+            const pingMessage2 = await pingStreamServer2(channelServer2Id); // Hier die Kanal-ID für Server 2 einfügen
+            if (pingMessage2 && pingMessage2.content) {
+                message.channel.send(pingMessage2).then(msg => msg.delete()); // Nachricht senden und sofort löschen
+            }
+
+            // Nachricht, die den Befehl !ping enthält, löschen
+            message.delete(); // Lösche die ursprüngliche Nachricht
         }
-    });
-
-    // Überwache das Ende des Kollektors
-    collector.on('end', () => {
-        // Entferne die Reaktionen und Nachricht, wenn der Kollektor endet
-        onAirMessage.reactions.removeAll();
-    });
+    }
 });
+// Hilfsfunktion zum Parsen der Uhrzeit und Umwandeln in Minuten seit Mitternacht
+function parseTime(timeString) {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  return hours * 60 + minutes;
+}
 
-// Den Bot mit deinem Token anmelden WICHTIG DU MUSST DIE DATA.json füllen!
+// Funktion zur Extrahierung der Sendeplaninformationen und Speicherung in einer Datei
+async function extractAndSendScheduleInfo() {
+    try {
+        // Sendeplaninformationen aus der "PlanDaten.json"-Datei lesen
+        const jsonFilePath = 'PlanDaten.json';
+        const jsonContent = fs.readFileSync(jsonFilePath, 'utf8');
+        const sendeplanData = JSON.parse(jsonContent);
+    
+        // Sendeplaninformationen extrahieren
+        const { date, schedule } = sendeplanData;
+    
+        // Überprüfen, ob Daten vorhanden sind
+        if (!date || !schedule || schedule.length === 0) {
+            console.error('Ungültige oder leere Sendeplaninformationen.');
+            return;
+        }
+        // Durch jeden Eintrag im Sendeplan iterieren und Nachrichten senden
+        for (const entry of schedule) {
+            const { time, moderator, description, event } = entry;
+
+            // Nachricht im Discord-Format erstellen
+            const embed = new MessageEmbed()
+                .setTitle(`(:radio:) Sendeplan ${date} (:radio:)`)
+                .addField('Uhrzeit', time)
+                .addField('Moderator', moderator)
+                .addField('Beschreibung', description)
+                .addField('Event', event)
+                .setFooter('Powered by DBKS');
+        }
+            // Discord-Webhook erstellen und Nachricht senden
+            const webhookClient = new WebhookClient({ url: webhookUrl });
+            await webhookClient.send({ embeds: [embed] });
+
+            console.log('Sendeplan erfolgreich in Discord gepostet');
+
+        // Sendeplaninformationen in "Sendeplan.json" speichern
+        const sendeplanFilePath = 'Sendeplan.json';
+        let existingSendeplan = [];
+
+        if (fs.existsSync(sendeplanFilePath)) {
+            existingSendeplan = JSON.parse(fs.readFileSync(sendeplanFilePath, 'utf8'));
+        }
+
+        existingSendeplan.push(sendeplanData);
+
+        fs.writeFileSync(sendeplanFilePath, JSON.stringify(existingSendeplan, null, 2));
+
+    } catch (error) {
+        console.error('Fehler beim Abrufen des Sendeplans oder Senden der Nachricht:', error);
+    }
+}
+
+// Den Bot mit deinem Token anmelden (WICHTIG: Du musst die DATA.json-Datei füllen!)
 client.login(discord_token);
