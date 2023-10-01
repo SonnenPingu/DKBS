@@ -9,8 +9,8 @@ let lastPlayedArtist = '';
 let previousModerator = null; // Speichert den vorherigen Moderator
 let previousTime = null; // Speichert die vorherige Uhrzeit
 
-// Lese die Token-Daten aus DATA.json
-const data = fs.readFileSync('DATA.json', 'utf8');
+// Lese die Token-Daten aus Token.json
+const data = fs.readFileSync('Token.json', 'utf8');
 const { discord_token } = JSON.parse(data);
 
 const client = new Client({
