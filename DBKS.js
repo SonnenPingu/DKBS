@@ -3,7 +3,7 @@ const { Client, Intents, MessageEmbed, WebhookClient } = require('discord.js');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const jsdom = require('jsdom');
-
+const ntpClient = require('ntp-client');
 let lastPlayedTitle = '';
 let lastPlayedArtist = '';
 let previousModerator = null; // Speichert den vorherigen Moderator
