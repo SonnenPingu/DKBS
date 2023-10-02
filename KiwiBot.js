@@ -35,6 +35,20 @@ const sendeplanFilePath = 'Sendeplan.json'; // Dateipfad für die Sendeplaninfor
 const channelServer1Id = 'CHANNELID'; // Kanal-ID für Server 1
 const channelServer2Id = 'CHANNELID'; // Kanal-ID für Server 2
 
+// Definiere eine Aufgabe, die täglich um 5 Uhr morgens ausgeführt wird
+cron.schedule('0 5 * * *', async () => {
+    try {
+        // Führe die Funktion extractAndSaveData() aus, um den Sendeplan abzurufen und zu speichern
+        await extractAndSaveData();
+        console.log('Sendeplan erfolgreich abgerufen und gespeichert.');
+
+        // Führe die Funktion extractAndSendScheduleInfo() aus, um den Sendeplan zu verschicken
+        await extractAndSendScheduleInfo(message); // Stelle sicher, dass "message" korrekt definiert ist
+        console.log('Sendeplan erfolgreich verschickt.');
+    } catch (error) {
+        console.error('Fehler beim geplanten Ausführen der Aufgaben:', error);
+    }
+});
 //Aufruf Client
 client.once('ready', () => {
     console.log('Bot is ready!');
@@ -50,6 +64,59 @@ setInterval(() => {
     pingStreamServer2(channelServer2Id);
 }, pingInterval);
 });
+
+client.on('messageCreate', async message => {
+    if (message.author.bot) return;
+
+    // Überprüfen, ob die Nachricht mit dem Präfix beginnt
+    if (message.content.startsWith(prefix)) {
+        const args = message.content.slice(prefix.length).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
+
+        if (command === 'ping') {
+            // Führe die Ping-Funktion für Server 1 aus und sende die Statusnachricht
+            const pingMessage = await pingStreamServer1(channelServer1Id); // Hier die Kanal-ID für Server 1 einfügen
+            if (pingMessage && pingMessage.content) {
+                message.channel.send(pingMessage).then(msg => msg.delete()); // Nachricht senden und sofort löschen
+            }
+
+            // Führe die Ping-Funktion für Server 2 aus und sende die Statusnachricht
+            const pingMessage2 = await pingStreamServer2(channelServer2Id); // Hier die Kanal-ID für Server 2 einfügen
+            if (pingMessage2 && pingMessage2.content) {
+                message.channel.send(pingMessage2).then(msg => msg.delete()); // Nachricht senden und sofort löschen
+            }
+
+            // Nachricht, die den Befehl !ping enthält, löschen
+            message.delete(); // Lösche die ursprüngliche Nachricht
+        }
+
+        // Neuer Befehl !startExtract
+        if (command === 'startextract') {
+            try {
+                await extractAndSaveData();
+                message.channel.send('Datenextraktion erfolgreich abgeschlossen und gespeichert.');
+            } catch (error) {
+                console.error('Fehler beim manuellen Starten der Datenextraktion:', error);
+                message.channel.send('Fehler beim manuellen Starten der Datenextraktion.');
+            }
+        }
+
+        // Überprüfe, ob die Nachricht den Befehl "!plan" enthält
+        if (command === 'plan') {
+            try {
+                // Rufe die Funktion extractAndSendScheduleInfo() auf
+                await extractAndSendScheduleInfo(message);
+                message.channel.send('Befehl "!plan" wurde ausgeführt.');
+            } catch (error) {
+                console.error('Fehler beim Ausführen des Befehls "!plan":', error);
+                message.channel.send('Fehler beim Ausführen des Befehls "!plan".');
+            }
+        }
+        // Füge hier deine anderen Befehle und Logik hinzu
+        // ...
+    }
+});
+
 // Funktionen für Server 1
 async function checkStreamStatusServer1() {
     try {
@@ -227,89 +294,172 @@ async function pingStreamServer2(channelId) {
         console.error('Fehler beim Pingen und Aktualisieren des Status auf Server 2:', error);
     }
 }
-client.on('messageCreate', async message => {
-    if (message.author.bot) return;
-
-    // Überprüfen, ob die Nachricht mit dem Präfix beginnt
-    if (message.content.startsWith(prefix)) {
-        const args = message.content.slice(prefix.length).trim().split(/ +/);
-        const command = args.shift().toLowerCase();
-
-        if (command === 'ping') {
-            // Führe die Ping-Funktion für Server 1 aus und sende die Statusnachricht
-            const pingMessage = await pingStreamServer1(channelServer1Id); // Hier die Kanal-ID für Server 1 einfügen
-            if (pingMessage && pingMessage.content) {
-                message.channel.send(pingMessage).then(msg => msg.delete()); // Nachricht senden und sofort löschen
-            }
-
-            // Führe die Ping-Funktion für Server 2 aus und sende die Statusnachricht
-            const pingMessage2 = await pingStreamServer2(channelServer2Id); // Hier die Kanal-ID für Server 2 einfügen
-            if (pingMessage2 && pingMessage2.content) {
-                message.channel.send(pingMessage2).then(msg => msg.delete()); // Nachricht senden und sofort löschen
-            }
-
-            // Nachricht, die den Befehl !ping enthält, löschen
-            message.delete(); // Lösche die ursprüngliche Nachricht
-        }
-    }
-});
-// Hilfsfunktion zum Parsen der Uhrzeit und Umwandeln in Minuten seit Mitternacht
+//Funktion zum Parsen der Uhrzeit und Umwandeln in Minuten seit Mitternacht
 function parseTime(timeString) {
   const [hours, minutes] = timeString.split(':').map(Number);
   return hours * 60 + minutes;
 }
+// Funktion zum Extrahieren der Bild-URL für den Moderator
+function extractModeratorImageUrl(htmlData, moderatorName) {
+    const $ = cheerio.load(htmlData);
+    const imgTags = $('img.img-responsive');
 
-// Funktion zur Extrahierung der Sendeplaninformationen und Speicherung in einer Datei
-async function extractAndSendScheduleInfo() {
+    for (let i = 0; i < imgTags.length; i++) {
+        const imgTag = $(imgTags[i]);
+        const src = imgTag.attr('src');
+        const normalizedModeratorName = moderatorName
+            .replace(/[ö]/g, 'oe')
+            .replace(/[ü]/g, 'ue')
+            .replace(/[ä]/g, 'ae')
+            .toLowerCase();
+
+        if (src && src.toLowerCase().includes(normalizedModeratorName)) {
+            return src;
+        }
+    }
+
+    // Wenn kein Bild gefunden wurde, gib einen Standard-URL zurück
+    return 'https://mystic-celduin.de/wp-content/uploads/2023/10/WhatsApp-Bild-2023-08-31-um-21.10.02.jpg';
+}
+// Funktion zum Abrufen der HTML-Daten
+async function fetchHTML() {
     try {
-        // Sendeplaninformationen aus der "PlanDaten.json"-Datei lesen
+        const response = await axios.get(sendeplanUrl);
+        return response.data;
+    } catch (error) {
+        console.error('Fehler beim Abrufen der HTML-Daten:', error);
+        throw error;
+    }
+}
+// Hauptfunktion zum Extrahieren und Speichern der Daten
+async function extractAndSaveData() {
+    try {
+        console.log('Die extractAndSaveData() - Funktion wird aufgerufen.');
+
+        // Hier startet der try-Block
+        const htmlData = await fetchHTML();
+        console.log('HTML-Daten erfolgreich abgerufen.');
+
+        const $ = cheerio.load(htmlData);
+
+        // Erstelle ein leeres Array, um die Daten zu speichern
+        const sendeplan = [];
+
+        // Durchlaufe die Tabellenzeilen und extrahiere die Informationen
+        $('tbody tr').each((index, element) => {
+            const row = $(element);
+
+            // Extrahiere die Zeit
+            const zeit = row.find('td:nth-child(1)').text().trim();
+
+            // Extrahiere die Beschreibung
+            const beschreibung = row.find('td:nth-child(2) a').text().trim();
+
+            // Extrahiere den Moderator
+            const moderator = row.find('td:nth-child(3)').text().trim();
+
+            // Überprüfe, ob es sich um ein Event handelt
+            const istEvent = row.hasClass('table-success');
+
+            // Füge die Daten dem sendeplan-Array hinzu
+            sendeplan.push({
+                zeit,
+                beschreibung,
+                moderator,
+                istEvent,
+            });
+        });
+
+        console.log('Daten erfolgreich extrahiert und in das sendeplan-Array eingefügt.');
+        console.log('Daten erfolgreich extrahiert und verarbeitet.');
+
+        // Speichere die Daten in einer JSON-Datei
+        fs.writeFileSync('PlanDaten.json', JSON.stringify(sendeplan, null, 2));
+
+        console.log('Daten erfolgreich in PlanDaten.json gespeichert.');
+    } catch (error) {
+        // Hier wird ein Fehler abgefangen, wenn er im try-Block auftritt
+        console.error('Fehler beim Extrahieren und Speichern der Daten:', error);
+    }
+}
+
+async function extractAndSendScheduleInfo(message, schedule) {
+    try {
+        // Pfad zur JSON-Datei festlegen
         const jsonFilePath = 'PlanDaten.json';
-        const jsonContent = fs.readFileSync(jsonFilePath, 'utf8');
-        const sendeplanData = JSON.parse(jsonContent);
-    
-        // Sendeplaninformationen extrahieren
-        const { date, schedule } = sendeplanData;
-    
-        // Überprüfen, ob Daten vorhanden sind
-        if (!date || !schedule || schedule.length === 0) {
-            console.error('Ungültige oder leere Sendeplaninformationen.');
+
+        // Überprüfen, ob die JSON-Datei existiert
+        if (!fs.existsSync(jsonFilePath)) {
+            console.error('Die JSON-Datei existiert nicht.');
+            message.channel.send('Die JSON-Datei existiert nicht.');
             return;
         }
-        // Durch jeden Eintrag im Sendeplan iterieren und Nachrichten senden
-        for (const entry of schedule) {
-            const { time, moderator, description, event } = entry;
 
-            // Nachricht im Discord-Format erstellen
-            const embed = new MessageEmbed()
-                .setTitle(`(:radio:) Sendeplan ${date} (:radio:)`)
-                .addField('Uhrzeit', time)
-                .addField('Moderator', moderator)
-                .addField('Beschreibung', description)
-                .addField('Event', event)
-                .setFooter('Powered by DBKS');
+        // JSON-Datei lesen und Daten parsen
+        const jsonContent = fs.readFileSync(jsonFilePath, 'utf8');
+        const sendeplanData = JSON.parse(jsonContent);
+
+        // Überprüfen, ob die Sendeplaninformationen vorhanden und nicht leer sind
+        if (!sendeplanData || !Array.isArray(sendeplanData) || sendeplanData.length === 0) {
+            console.error('Ungültige oder leere Sendeplaninformationen.');
+            message.channel.send('Ungültige oder leere Sendeplaninformationen.');
+            return;
         }
-            // Discord-Webhook erstellen und Nachricht senden
+
+        // Pfad zur HTML-Datei festlegen
+        const htmlFilePath = 'mod.html';
+
+        // HTML-Datei lesen und Inhalt in htmlData speichern
+        const htmlData = fs.readFileSync(htmlFilePath, 'utf8');
+
+//Durch jeden Eintrag im Sendeplan iterieren und nur gültige Einträge senden
+for (const entry of sendeplanData) {
+    if (entry.zeit && entry.beschreibung && entry.moderator) {
+        const { zeit, beschreibung, moderator, istEvent } = entry;
+
+        // Mod-Namen aus den Sendeplandaten und HTML in Kleinbuchstaben konvertieren
+        const modNameInSendeplan = moderator.toLowerCase();
+        const modNameInHtml = moderator.toLowerCase();
+        
+        // Überprüfen, ob der erste Buchstabe des Mod-Namens in Kleinbuchstaben ist
+        const isFirstLetterLowerCase = modNameInHtml[0] === modNameInHtml[0].toLowerCase();
+
+        // Falls der erste Buchstabe in Kleinbuchstaben ist, konvertiere ihn in Großbuchstaben
+        const modNameInMessage = isFirstLetterLowerCase
+            ? modNameInHtml.charAt(0).toUpperCase() + modNameInHtml.slice(1)
+            : modNameInHtml;
+
+        if (modNameInSendeplan === modNameInHtml) {
+            // Wenn sie übereinstimmen, extrahiere die Bild-URL
+            const moderatorImageUrl = extractModeratorImageUrl(htmlData, modNameInSendeplan);
+
+            const embed = new MessageEmbed()
+                .setTitle(`:radio: Sendeplan ${formattedDate} :radio:`)
+                .addFields(
+                    { name: 'Uhrzeit', value: zeit },
+                    { name: 'Moderator', value: modNameInMessage, inline: true }, // Hier den Mod-Namen in der Nachricht mit einem Großbuchstaben beginnend
+                    { name: 'Beschreibung', value: beschreibung },
+                    { name: 'Event', value: istEvent ? 'Ja' : 'Nein' }
+                )
+                .setImage(moderatorImageUrl)
+                .setFooter({ text: 'Powered by DBKS' });
+
+            if (istEvent) {
+                embed.setColor('#00FF00');
+            }
+
             const webhookClient = new WebhookClient({ url: webhookUrl });
             await webhookClient.send({ embeds: [embed] });
 
-            console.log('Sendeplan erfolgreich in Discord gepostet');
-
-        // Sendeplaninformationen in "Sendeplan.json" speichern
-        const sendeplanFilePath = 'Sendeplan.json';
-        let existingSendeplan = [];
-
-        if (fs.existsSync(sendeplanFilePath)) {
-            existingSendeplan = JSON.parse(fs.readFileSync(sendeplanFilePath, 'utf8'));
+            console.log(`Sendeplan erfolgreich in Discord gepostet für Zeit: ${zeit}`);
         }
-
-        existingSendeplan.push(sendeplanData);
-
-        fs.writeFileSync(sendeplanFilePath, JSON.stringify(existingSendeplan, null, 2));
+    }
+}
+console.log('Sendeplaninformationen wurden erfolgreich verarbeitet.');
 
     } catch (error) {
         console.error('Fehler beim Abrufen des Sendeplans oder Senden der Nachricht:', error);
     }
 }
-
 // Den Bot mit deinem Token anmelden (WICHTIG: Du musst die DATA.json-Datei füllen!)
 client.login(discord_token);
