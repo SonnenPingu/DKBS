@@ -1,5 +1,5 @@
 // Erstelle die "OnAir"-Schaltfläche
-async function createOnAirButton(channel, onAirRoleId) {
+async function createOnAirButton(channel, onAirRoleId, message) {
     const onAirMessage = await channel.send('Klicke auf das Symbol für die "OnAir" Anzeige! 🎙️');
     await onAirMessage.react('🎙️');
 
