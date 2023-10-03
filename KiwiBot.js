@@ -163,12 +163,12 @@ async function checkStreamStatusServer1() {
             console.error('Ungültige Werte für Nachricht auf Server 1.');
             
             // Fallback-Titel und Interpret, wenn keine gefunden werden
-            artist = 'Kiwi Sound';
-            title = 'Der böse';
+            artist = 'XXX'; // Muss geändert werden
+            title = 'XXX'; // Muss geändert werden
             
             // Fallback für Moderator, wenn kein Moderator nach dem | gefunden wird
-            if (text.includes('<a href="currentsong?sid=1">')) {
-                finalModerator = text.split('<a href="currentsong?sid=1">')[1].split('</a>')[0];
+            if (text.includes('<a href="currentsong?sid=1">')) { /(/< Muss angepasst werden
+                finalModerator = text.split('<a href="currentsong?sid=1">')[1].split('</a>')[0]; //Muss angepasst werden
             }
         }
 
@@ -312,7 +312,8 @@ function extractModeratorImageUrl(htmlData, moderatorName) {
             .replace(/[ö]/g, 'oe')
             .replace(/[ü]/g, 'ue')
             .replace(/[ä]/g, 'ae')
-            .toLowerCase();
+            .toLowerCase()
+            .replace(/\s/g, ''); // Entferne Leerzeichen
 
         if (src && src.toLowerCase().includes(normalizedModeratorName)) {
             return src;
@@ -320,7 +321,7 @@ function extractModeratorImageUrl(htmlData, moderatorName) {
     }
 
     // Wenn kein Bild gefunden wurde, gib einen Standard-URL zurück
-    return 'https://mystic-celduin.de/wp-content/uploads/2023/10/WhatsApp-Bild-2023-08-31-um-21.10.02.jpg';
+    return ' XXX'; //Muss durch eine BildUrl ersetzt werden.
 }
 // Funktion zum Abrufen der HTML-Daten
 async function fetchHTML() {
@@ -443,7 +444,7 @@ for (const entry of sendeplanData) {
                     { name: 'Event', value: istEvent ? 'Ja' : 'Nein' }
                 )
                 .setImage(moderatorImageUrl)
-                .setFooter({ text: 'Powered by DBKS' });
+                .setFooter({ text: 'Anpassen' }); //Unbedingt anpassen
 
             if (istEvent) {
                 embed.setColor('#00FF00');
