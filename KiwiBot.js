@@ -52,6 +52,7 @@ cron.schedule('0 5 * * *', async () => {
 //Aufruf Client
 client.once('ready', () => {
     console.log('Bot is ready!');
+    createOnAirButton(channel, onAirRoleId);
     checkStreamStatusServer1();
     setInterval(checkStreamStatusServer1, 60000);
 // Intervall für das Pingen und Senden von Statusnachrichten für Server 1
@@ -460,6 +461,33 @@ console.log('Sendeplaninformationen wurden erfolgreich verarbeitet.');
     } catch (error) {
         console.error('Fehler beim Abrufen des Sendeplans oder Senden der Nachricht:', error);
     }
+}
+// Funktion zum Überprüfen und Aktualisieren der OnAir-Rolle
+async function toggleOnAirRole(user, channel, onAirRoleId) {
+    if (!user.bot) {
+        const member = channel.guild.members.cache.get(user.id);
+        if (member.roles.cache.has(onAirRoleId)) {
+            // Benutzer hat bereits die "OnAir"-Rolle, entferne sie
+            await member.roles.remove(onAirRoleId);
+        } else {
+            // Benutzer hat die "OnAir"-Rolle nicht, füge sie hinzu
+            await member.roles.add(onAirRoleId);
+        }
+    }
+}
+
+// Erstelle die "OnAir"-Schaltfläche
+async function createOnAirButton(channel, onAirRoleId) {
+    const onAirMessage = await channel.send('Klicke auf das Symbol für die "OnAir" Anzeige! 🎙️');
+    await onAirMessage.react('🎙️');
+
+    const filter = (reaction, user) => reaction.emoji.name === '🎙️' && !user.bot;
+    const collector = onAirMessage.createReactionCollector({ filter, time: 60000 });
+
+    collector.on('collect', async (reaction, user) => {
+        await toggleOnAirRole(user, channel, onAirRoleId);
+        await reaction.users.remove(user.id);
+    });
 }
 // Den Bot mit deinem Token anmelden (WICHTIG: Du musst die DATA.json-Datei füllen!)
 client.login(discord_token);
