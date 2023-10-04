@@ -34,6 +34,9 @@ const sendeplanUrl = 'URL'; // Aktualisiere die URL für den Sendeplan
 const sendeplanFilePath = 'Sendeplan.json'; // Dateipfad für die Sendeplaninformationen
 const channelServer1Id = 'CHANNELID'; // Kanal-ID für Server 1
 const channelServer2Id = 'CHANNELID'; // Kanal-ID für Server 2
+const birthdayUser = 'Benutzername'; // Hier den Benutzernamen des Geburtstagskindes einsetzen
+const channel = message.channel; // Hier den Kanal angeben, in dem du die Nachricht senden möchtest
+
 
 // Definiere eine Aufgabe, die täglich um 5 Uhr morgens ausgeführt wird
 cron.schedule('0 5 * * *', async () => {
@@ -476,7 +479,6 @@ async function toggleOnAirRole(user, channel, onAirRoleId) {
         }
     }
 }
-
 // Erstelle die "OnAir"-Schaltfläche
 async function createOnAirButton(channel, onAirRoleId) {
     const onAirMessage = await channel.send('Klicke auf das Symbol für die "OnAir" Anzeige! 🎙️');
@@ -489,6 +491,100 @@ async function createOnAirButton(channel, onAirRoleId) {
         await toggleOnAirRole(user, channel, onAirRoleId);
         await reaction.users.remove(user.id);
     });
+}
+function loadBirthdayData() {
+    try {
+        const data = fs.readFileSync(birthdayFilePath, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Fehler beim Laden der Geburtstagsdaten:', error);
+        return {};
+    }
+}
+
+function calculateAge(birthdate) {
+    const today = new Date();
+    const birthDate = new Date(birthdate);
+    const age = today.getFullYear() - birthDate.getFullYear();
+
+    // Überprüfe, ob der Geburtstag dieses Jahr bereits stattgefunden hat
+    if (today < new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate())) {
+        age--;
+    }
+
+    return age;
+}
+
+function calculateAge(birthdate) {
+    const today = new Date();
+    const birthDate = new Date(birthdate);
+    const age = today.getFullYear() - birthDate.getFullYear();
+
+    // Überprüfe, ob der Geburtstag dieses Jahr bereits stattgefunden hat
+    if (today < new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate())) {
+        age--;
+    }
+
+    return age;
+}
+
+async function checkBirthdays() {
+    const today = new Date();
+    const currentDate = `${today.getMonth() + 1}-${today.getDate()}`; // Format: JJJJ-MM-DD
+
+    const birthdayData = loadBirthdayData(); // Stelle sicher, dass die Funktion `loadBirthdayData` definiert ist und die Geburtstagsdaten zurückgibt
+
+    for (const username in birthdayData) {
+        if (birthdayData.hasOwnProperty(username)) {
+            const birthdate = birthdayData[username];
+
+            if (birthdate === currentDate) {
+                const birthdayUser = client.users.cache.find((user) => user.username === username);
+
+                if (birthdayUser) {
+                    const age = calculateAge(birthdate);
+
+                    // Sende Geburtstagsnachricht in den Zielkanal
+                    await sendBirthdayMessage(birthdayUser, username, age, channelId);
+                    console.log(`Geburtstagsnachricht an ${birthdayUser.username} im Kanal gesendet.`);
+                }
+            }
+        }
+    }
+}
+
+async function sendBirthdayMessage(user, username, age, channelId) {
+    const birthdayEmbed = {
+        color: 0xffd700, // Goldene Farbe
+        title: `:birthday: Geburtstagsgrüße :birthday:`,
+        description: `Der Böse KiwiSound wünscht ${user} alles Gute zum Geburtstag! Du bist jetzt ${age} Jahre alt. :tada: :confetti_ball:`,
+        timestamp: new Date(),
+        footer: {
+            text: 'Powered by DBKS',
+        },
+    };
+
+    // Hier weise die spezielle Rolle zu, falls vorhanden
+    const guild = user.guild;
+    if (guild) {
+        const role = guild.roles.cache.get(roleId);
+        if (role) {
+            await user.roles.add(role);
+        }
+    }
+
+    // Hier sendest du die Nachricht in den Zielkanal
+    const channel = user.client.channels.cache.get(channelId);
+    if (channel && channel.type === "text") {
+        try {
+            await channel.send({ embed: birthdayEmbed });
+            console.log(`Geburtstagsnachricht an ${username} im Kanal gesendet.`);
+        } catch (error) {
+            console.error(`Fehler beim Senden der Geburtstagsnachricht an ${username}:`, error);
+        }
+    } else {
+        console.error(`Ungültiger Kanal oder Kanal nicht gefunden.`);
+    }
 }
 // Den Bot mit deinem Token anmelden (WICHTIG: Du musst die DATA.json-Datei füllen!)
 client.login(discord_token);
