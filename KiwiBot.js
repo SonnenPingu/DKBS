@@ -36,22 +36,20 @@ const channelServer1Id = 'CHANNELID'; // Kanal-ID für Server 1
 const channelServer2Id = 'CHANNELID'; // Kanal-ID für Server 2
 const birthdayUser = 'Benutzername'; // Hier den Benutzernamen des Geburtstagskindes einsetzen
 const channel = message.channel; // Hier den Kanal angeben, in dem du die Nachricht senden möchtest
+const currentDate = new Date();
+const formattedDate = `${currentDate.getDate()}.${currentDate.getMonth() + 1}.${currentDate.getFullYear() % 100}`;
+const rolleID = '' 
 
-
-// Definiere eine Aufgabe, die täglich um 5 Uhr morgens ausgeführt wird
-cron.schedule('0 5 * * *', async () => {
-    try {
-        // Führe die Funktion extractAndSaveData() aus, um den Sendeplan abzurufen und zu speichern
-        await extractAndSaveData();
-        console.log('Sendeplan erfolgreich abgerufen und gespeichert.');
-
+cron.schedule('0 7 * * *', { timeZone: 'Europe/Berlin' }, async () => { //passe die gewünschte Zeitzone an.
+    try {  // Führe die Funktion extractAndSaveData() aus, um den Sendeplan abzurufen und zu speichern 
+        await extractAndSaveData(); console.log('Sendeplan erfolgreich abgerufen und gespeichert.');
         // Führe die Funktion extractAndSendScheduleInfo() aus, um den Sendeplan zu verschicken
-        await extractAndSendScheduleInfo(message); // Stelle sicher, dass "message" korrekt definiert ist
-        console.log('Sendeplan erfolgreich verschickt.');
-    } catch (error) {
-        console.error('Fehler beim geplanten Ausführen der Aufgaben:', error);
-    }
-});
+    await extractAndSendScheduleInfo(message); // Stelle sicher, dass "message" korrekt definiert ist
+    console.log('Sendeplan erfolgreich verschickt.');
+} catch (error) {
+    console.error('Fehler beim geplanten Ausführen der Aufgaben:', error);
+}});
+
 //Aufruf Client
 client.once('ready', () => {
     console.log('Bot is ready!');
